@@ -103,6 +103,24 @@ class PwmInput(BaseModel):
     duty: int = Field(default=512, description="Duty cycle 0-1023", ge=0, le=1023)
 
 
+class AdcReadInput(BaseModel):
+    model_config = ConfigDict(str_strip_whitespace=True)
+    pin: int = Field(..., description="ADC-capable GPIO pin (e.g. 1-10)", ge=0, le=48)
+    atten: int = Field(default=11, description="Attenuation: 0=0dB(1V), 1=2.5dB(1.25V), 2=6dB(2V), 3=11dB(3.6V)", ge=0, le=3)
+
+
+class I2cScanInput(BaseModel):
+    model_config = ConfigDict(str_strip_whitespace=True)
+    sda: int = Field(default=21, description="SDA pin")
+    scl: int = Field(default=22, description="SCL pin")
+
+
+class WifiConfigInput(BaseModel):
+    model_config = ConfigDict(str_strip_whitespace=True)
+    ssid: str = Field(..., description="WiFi SSID to connect to", min_length=1)
+    password: str = Field(..., description="WiFi password")
+
+
 # ── Tools ──────────────────────────────────────────────────────
 
 @mcp.tool(
@@ -382,6 +400,153 @@ async def reboot() -> str:
     except Exception:
         pass
     return "ESP32 rebooting..."
+
+
+@mcp.tool(
+    name="esp32_adc_read",
+    annotations={
+        "title": "Read ESP32 ADC Pin",
+        "readOnlyHint": True,
+        "destructiveHint": False,
+        "idempotentHint": True,
+        "openWorldHint": True,
+    },
+)
+async def adc_read(params: AdcReadInput) -> str:
+    """Read the analog voltage from an ADC-capable GPIO pin.
+
+    Configures the pin as ADC with the specified attenuation and returns
+    both the raw value (0-4095) and the voltage in millivolts.
+
+    Args:
+        params (AdcReadInput): ADC read parameters containing:
+            - pin (int): ADC-capable GPIO pin number
+            - atten (int): Attenuation: 0=0dB(1V), 1=2.5dB(1.25V), 2=6dB(2V), 3=11dB(3.6V, default)
+
+    Returns:
+        str: ADC reading with raw value and voltage
+
+    Examples:
+        - Read floating pin 4 with 11dB attenuation: pin=4, atten=3
+    """
+    p, a = params.pin, params.atten
+    atten_map = {0: "ATTN_0DB", 1: "ATTN_2_5DB", 2: "ATTN_6DB", 3: "ATTN_11DB"}
+    code = f"import machine; adc=machine.ADC(machine.Pin({p})); adc.atten(machine.ADC.{atten_map.get(a, 'ATTN_11DB')}); print('ADC pin', {p}, ':', adc.read(), 'raw,', adc.read_uv()//1000, 'mV')"
+    try:
+        result = _repl_exec(code)
+        return result or f"ADC pin {p} read complete"
+    except Exception as e:
+        return f"Error: {e}"
+
+
+@mcp.tool(
+    name="esp32_i2c_scan",
+    annotations={
+        "title": "Scan I2C Bus for Devices",
+        "readOnlyHint": True,
+        "destructiveHint": False,
+        "idempotentHint": True,
+        "openWorldHint": True,
+    },
+)
+async def i2c_scan(params: I2cScanInput) -> str:
+    """Scan the I2C bus for connected devices.
+
+    Scans addresses 0x04-0x77 on the I2C bus and returns a list
+    of detected device addresses. Requires SDA and SCL pins.
+
+    Args:
+        params (I2cScanInput): I2C scan parameters containing:
+            - sda (int): SDA pin (default: 21)
+            - scl (int): SCL pin (default: 22)
+
+    Returns:
+        str: List of detected I2C device addresses
+
+    Examples:
+        - Default I2C pins: sda=21, scl=22
+    """
+    sda, scl = params.sda, params.scl
+    code = f"import machine; i2c=machine.I2C(0, sda=machine.Pin({sda}), scl=machine.Pin({scl})); devices=i2c.scan(); print('I2C devices:', [hex(d) for d in devices]); print('Count:', len(devices))"
+    try:
+        result = _repl_exec(code)
+        if not result or "Count: 0" in result:
+            return "No I2C devices found on this bus."
+        return result
+    except Exception as e:
+        return f"Error: {e}"
+
+
+@mcp.tool(
+    name="esp32_temperature",
+    annotations={
+        "title": "Read ESP32 Internal Temperature",
+        "readOnlyHint": True,
+        "destructiveHint": False,
+        "idempotentHint": True,
+        "openWorldHint": True,
+    },
+)
+async def temperature() -> str:
+    """Read the ESP32's internal MCU temperature sensor.
+
+    Returns the chip's internal temperature in degrees Celsius.
+    The sensor is built into the ESP32 and reflects the die temperature.
+    No parameters required.
+    """
+    code = "import esp32; t=esp32.mcu_temperature(); print('MCU temperature:', t, 'C')"
+    try:
+        result = _repl_exec(code)
+        return result or "Temperature read complete"
+    except Exception as e:
+        return f"Error: {e}"
+
+
+@mcp.tool(
+    name="esp32_wifi_config",
+    annotations={
+        "title": "Configure ESP32 WiFi Connection",
+        "readOnlyHint": False,
+        "destructiveHint": False,
+        "idempotentHint": False,
+        "openWorldHint": True,
+    },
+)
+async def wifi_config(params: WifiConfigInput) -> str:
+    """Connect the ESP32 to a WiFi network.
+
+    Configures the ESP32 as a WiFi station and connects to the
+    specified network. Returns the assigned IP address on success.
+
+    Args:
+        params (WifiConfigInput): WiFi configuration containing:
+            - ssid (str): WiFi network name
+            - password (str): WiFi network password
+
+    Returns:
+        str: Connection result with IP address or error
+
+    Examples:
+        - Connect to home network: ssid="MyWiFi", password="secret123"
+    """
+    code = (
+        f"import network, time; "
+        f"w=network.WLAN(network.STA_IF); "
+        f"w.active(True); "
+        f"if w.isconnected(): print('Already connected:', w.ifconfig()[0]); "
+        f"else: "
+        f" w.connect('{params.ssid}','{params.password}'); "
+        f" for i in range(30): "
+        f"  if w.isconnected(): break; "
+        f"  time.sleep(1); "
+        f" if w.isconnected(): print('Connected, IP:', w.ifconfig()[0]); "
+        f" else: print('Failed to connect to', '{params.ssid}')"
+    )
+    try:
+        result = _repl_exec(code, timeout=40)
+        return result or f"WiFi config attempted for {params.ssid}"
+    except Exception as e:
+        return f"Error: {e}"
 
 
 if __name__ == "__main__":
