@@ -96,29 +96,27 @@ class NeopixelInput(BaseModel):
     index: int = Field(default=0, description="LED index (for chains)", ge=0)
 
 
-class PwmInput(BaseModel):
-    model_config = ConfigDict(str_strip_whitespace=True)
-    pin: int = Field(..., description="GPIO pin for PWM", ge=0, le=48)
-    freq: int = Field(default=1000, description="PWM frequency in Hz", ge=1, le=40000)
-    duty: int = Field(default=512, description="Duty cycle 0-1023", ge=0, le=1023)
-
-
 class AdcReadInput(BaseModel):
     model_config = ConfigDict(str_strip_whitespace=True)
     pin: int = Field(..., description="ADC-capable GPIO pin (e.g. 1-10)", ge=0, le=48)
     atten: int = Field(default=11, description="Attenuation: 0=0dB(1V), 1=2.5dB(1.25V), 2=6dB(2V), 3=11dB(3.6V)", ge=0, le=3)
 
 
-class I2cScanInput(BaseModel):
-    model_config = ConfigDict(str_strip_whitespace=True)
-    sda: int = Field(default=21, description="SDA pin")
-    scl: int = Field(default=22, description="SCL pin")
-
-
 class WifiConfigInput(BaseModel):
     model_config = ConfigDict(str_strip_whitespace=True)
     ssid: str = Field(..., description="WiFi SSID to connect to", min_length=1)
     password: str = Field(..., description="WiFi password")
+
+
+class FileWriteInput(BaseModel):
+    model_config = ConfigDict(str_strip_whitespace=True)
+    path: str = Field(..., description="File path on ESP32 (e.g. 'boot.py')", min_length=1, max_length=256)
+    content: str = Field(..., description="File content to write")
+
+
+class FileDeleteInput(BaseModel):
+    model_config = ConfigDict(str_strip_whitespace=True)
+    path: str = Field(..., description="File path to delete", min_length=1, max_length=256)
 
 
 # ── Tools ──────────────────────────────────────────────────────
@@ -313,96 +311,6 @@ async def chip_info() -> str:
 
 
 @mcp.tool(
-    name="pwm",
-    annotations={
-        "title": "Control ESP32 PWM Output",
-        "readOnlyHint": False,
-        "destructiveHint": False,
-        "idempotentHint": True,
-        "openWorldHint": True,
-    },
-)
-async def pwm(params: PwmInput) -> str:
-    """Set up PWM output on an ESP32 GPIO pin.
-
-    Configures the specified pin for PWM with given frequency and duty cycle.
-    Duty cycle range is 0-1023 (0% to 100%).
-
-    Args:
-        params (PwmInput): PWM configuration containing:
-            - pin (int): GPIO pin number
-            - freq (int): Frequency in Hz (1-40000, default: 1000)
-            - duty (int): Duty cycle (0-1023, default: 512)
-
-    Returns:
-        str: Confirmation of PWM configuration
-
-    Examples:
-        - 50% dim LED on GPIO2: pin=2, freq=5000, duty=512
-        - Full brightness on GPIO2: pin=2, freq=5000, duty=1023
-    """
-    p, f, d = params.pin, params.freq, params.duty
-    code = f"import machine; pwm=machine.PWM(machine.Pin({p}), freq={f}, duty={d}); print('PWM on GPIO{p}: {f}Hz, duty {d}')"
-    try:
-        return _repl_exec(code) or f"PWM configured on GPIO{p}"
-    except Exception as e:
-        return f"Error: {e}"
-
-
-@mcp.tool(
-    name="scan_wifi",
-    annotations={
-        "title": "Scan WiFi Networks",
-        "readOnlyHint": True,
-        "destructiveHint": False,
-        "idempotentHint": True,
-        "openWorldHint": True,
-    },
-)
-async def scan_wifi() -> str:
-    """Scan for nearby WiFi networks using the ESP32.
-
-    Returns a list of visible WiFi access points with SSID, signal strength, and security info.
-    No parameters required.
-    """
-    code = (
-        "import network; "
-        "w=network.WLAN(network.STA_IF); "
-        "w.active(True); "
-        "aps=w.scan(); "
-        "[print('{:25s} {:4d} dBm  CH{}'.format(a[0].decode() if isinstance(a[0],bytes) else str(a[0]), a[3], a[2])) for a in sorted(aps, key=lambda x:-x[3])]"
-    )
-    try:
-        result = _repl_exec(code, timeout=15)
-        return result or "No networks found"
-    except Exception as e:
-        return f"Error: {e}"
-
-
-@mcp.tool(
-    name="reboot",
-    annotations={
-        "title": "Reboot ESP32",
-        "readOnlyHint": False,
-        "destructiveHint": True,
-        "idempotentHint": False,
-        "openWorldHint": True,
-    },
-)
-async def reboot() -> str:
-    """Soft-reboot the ESP32 microcontroller.
-
-    Triggers a MicroPython soft reboot. The board will restart and re-run boot.py.
-    Connection will briefly drop then come back.
-    """
-    try:
-        _repl_exec("import sys; print('Rebooting...'); sys.exit()", timeout=3)
-    except Exception:
-        pass
-    return "ESP32 rebooting..."
-
-
-@mcp.tool(
     name="adc_read",
     annotations={
         "title": "Read ESP32 ADC Pin",
@@ -435,69 +343,6 @@ async def adc_read(params: AdcReadInput) -> str:
     try:
         result = _repl_exec(code)
         return result or f"ADC pin {p} read complete"
-    except Exception as e:
-        return f"Error: {e}"
-
-
-@mcp.tool(
-    name="i2c_scan",
-    annotations={
-        "title": "Scan I2C Bus for Devices",
-        "readOnlyHint": True,
-        "destructiveHint": False,
-        "idempotentHint": True,
-        "openWorldHint": True,
-    },
-)
-async def i2c_scan(params: I2cScanInput) -> str:
-    """Scan the I2C bus for connected devices.
-
-    Scans addresses 0x04-0x77 on the I2C bus and returns a list
-    of detected device addresses. Requires SDA and SCL pins.
-
-    Args:
-        params (I2cScanInput): I2C scan parameters containing:
-            - sda (int): SDA pin (default: 21)
-            - scl (int): SCL pin (default: 22)
-
-    Returns:
-        str: List of detected I2C device addresses
-
-    Examples:
-        - Default I2C pins: sda=21, scl=22
-    """
-    sda, scl = params.sda, params.scl
-    code = f"import machine; i2c=machine.I2C(0, sda=machine.Pin({sda}), scl=machine.Pin({scl})); devices=i2c.scan(); print('I2C devices:', [hex(d) for d in devices]); print('Count:', len(devices))"
-    try:
-        result = _repl_exec(code)
-        if not result or "Count: 0" in result:
-            return "No I2C devices found on this bus."
-        return result
-    except Exception as e:
-        return f"Error: {e}"
-
-
-@mcp.tool(
-    name="temperature",
-    annotations={
-        "title": "Read ESP32 Internal Temperature",
-        "readOnlyHint": True,
-        "destructiveHint": False,
-        "idempotentHint": True,
-        "openWorldHint": True,
-    },
-)
-async def temperature() -> str:
-    """Read the ESP32's internal MCU temperature sensor.
-
-    Returns the chip's internal temperature in degrees Celsius.
-    The sensor is built into the ESP32 and reflects the die temperature.
-    No parameters required.
-    """
-    code = "import esp32; t=esp32.mcu_temperature(); print('MCU temperature:', t, 'C')"
-    try:
-        result = _repl_exec(code)
-        return result or "Temperature read complete"
     except Exception as e:
         return f"Error: {e}"
 
@@ -545,6 +390,133 @@ async def wifi_config(params: WifiConfigInput) -> str:
     try:
         result = _repl_exec(code, timeout=40)
         return result or f"WiFi config attempted for {params.ssid}"
+    except Exception as e:
+        return f"Error: {e}"
+
+
+@mcp.tool(
+    name="file_list",
+    annotations={
+        "title": "List Files on ESP32",
+        "readOnlyHint": True,
+        "destructiveHint": False,
+        "idempotentHint": True,
+        "openWorldHint": True,
+    },
+)
+async def file_list() -> str:
+    """List files and directories on the ESP32 filesystem.
+
+    Returns the contents of the root directory.
+    No parameters required.
+    """
+    code = "import os; items=os.ilistdir('/'); print('{:30s} {:>8s}'.format('Name','Size')); print('-'*40); [print('{:30s} {:>8d}'.format(n, s if t==0x8000 else 0)) for t, n, s, *_ in sorted(items)]"
+    try:
+        result = _repl_exec(code)
+        return result or "(empty)"
+    except Exception as e:
+        return f"Error: {e}"
+
+
+@mcp.tool(
+    name="file_read",
+    annotations={
+        "title": "Read File from ESP32",
+        "readOnlyHint": True,
+        "destructiveHint": False,
+        "idempotentHint": True,
+        "openWorldHint": True,
+    },
+)
+async def file_read(path: str) -> str:
+    """Read a file from the ESP32 filesystem.
+
+    Args:
+        path (str): File path on ESP32 (e.g. 'boot.py')
+
+    Returns:
+        str: File contents
+
+    Examples:
+        - Read boot config: path='boot.py'
+    """
+    code = f"f=open('{path}'); print(f.read()); f.close()"
+    try:
+        result = _repl_exec(code)
+        return result or f"File '{path}' is empty"
+    except Exception as e:
+        return f"Error: {e}"
+
+
+@mcp.tool(
+    name="file_write",
+    annotations={
+        "title": "Write File to ESP32",
+        "readOnlyHint": False,
+        "destructiveHint": True,
+        "idempotentHint": True,
+        "openWorldHint": True,
+    },
+)
+async def file_write(params: FileWriteInput) -> str:
+    """Write content to a file on the ESP32 filesystem.
+
+    Creates or overwrites a file with the given content.
+
+    Args:
+        params (FileWriteInput): File write parameters containing:
+            - path (str): File path (e.g. 'boot.py')
+            - content (str): File content to write
+
+    Returns:
+        str: Confirmation of the write operation
+
+    Examples:
+        - Write boot.py: path='boot.py', content='import webrepl\\nwebrepl.start()'
+    """
+    import base64
+    encoded = base64.b64encode(params.content.encode()).decode()
+    code = (
+        f"import base64; "
+        f"f=open('{params.path}','w'); "
+        f"f.write(base64.b64decode('{encoded}').decode()); "
+        f"f.close(); "
+        f"print('Written', len(base64.b64decode('{encoded}')), 'bytes to', '{params.path}')"
+    )
+    try:
+        result = _repl_exec(code)
+        return result or f"Written to {params.path}"
+    except Exception as e:
+        return f"Error: {e}"
+
+
+@mcp.tool(
+    name="file_delete",
+    annotations={
+        "title": "Delete File on ESP32",
+        "readOnlyHint": False,
+        "destructiveHint": True,
+        "idempotentHint": True,
+        "openWorldHint": True,
+    },
+)
+async def file_delete(params: FileDeleteInput) -> str:
+    """Delete a file from the ESP32 filesystem.
+
+    Args:
+        params (FileDeleteInput): File deletion parameters containing:
+            - path (str): File path to delete
+
+    Returns:
+        str: Confirmation of deletion
+
+    Examples:
+        - Delete a file: path='test.txt'
+    """
+    code = f"import os; os.remove('{params.path}'); print('Deleted', '{params.path}')"
+    try:
+        result = _repl_exec(code)
+        return result or f"Deleted {params.path}"
     except Exception as e:
         return f"Error: {e}"
 
