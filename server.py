@@ -278,17 +278,21 @@ async def adc_read(params: AdcReadInput) -> str:
 async def wifi_config(params: WifiConfigInput) -> str:
     """Connect ESP32 to a WiFi network. Returns IP address."""
     code = (
-        f"import network, time; "
-        f"w=network.WLAN(network.STA_IF); "
-        f"w.active(True); "
-        f"if w.isconnected(): print('Already connected:', w.ifconfig()[0]); "
-        f"else: "
-        f" w.connect('{params.ssid}','{params.password}'); "
-        f" for i in range(30): "
-        f"  if w.isconnected(): break; "
-        f"  time.sleep(1); "
-        f" if w.isconnected(): print('Connected, IP:', w.ifconfig()[0]); "
-        f" else: print('Failed to connect to', '{params.ssid}')"
+        f"import network, time\n"
+        f"w = network.WLAN(network.STA_IF)\n"
+        f"w.active(True)\n"
+        f"if w.isconnected():\n"
+        f"    print('Already connected:', w.ifconfig()[0])\n"
+        f"else:\n"
+        f"    w.connect('{params.ssid}', '{params.password}')\n"
+        f"    for i in range(30):\n"
+        f"        if w.isconnected():\n"
+        f"            break\n"
+        f"        time.sleep(1)\n"
+        f"    if w.isconnected():\n"
+        f"        print('Connected, IP:', w.ifconfig()[0])\n"
+        f"    else:\n"
+        f"        print('Failed:', '{params.ssid}')\n"
     )
     try:
         result = _repl_exec(code, timeout=40)
@@ -350,7 +354,7 @@ async def file_read(path: str) -> str:
 async def file_write(params: FileWriteInput) -> str:
     """Write or overwrite a file on ESP32."""
     import binascii
-    encoded = binascii.b2a_base64(params.content.encode()).decode()
+    encoded = binascii.b2a_base64(params.content.encode()).decode().strip()
     code = (
         f"import binascii; "
         f"f=open('{params.path}','w'); "
