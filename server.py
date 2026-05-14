@@ -410,7 +410,7 @@ async def file_list() -> str:
     Returns the contents of the root directory.
     No parameters required.
     """
-    code = "import os; items=os.ilistdir('/'); print('{:30s} {:>8s}'.format('Name','Size')); print('-'*40); [print('{:30s} {:>8d}'.format(n, s if t==0x8000 else 0)) for t, n, s, *_ in sorted(items)]"
+    code = "import os; [print(x[0], x[3], 'bytes') for x in os.ilistdir('/') if x[1]==32768]"
     try:
         result = _repl_exec(code)
         return result or "(empty)"
@@ -474,14 +474,14 @@ async def file_write(params: FileWriteInput) -> str:
     Examples:
         - Write boot.py: path='boot.py', content='import webrepl\\nwebrepl.start()'
     """
-    import base64
-    encoded = base64.b64encode(params.content.encode()).decode()
+    import binascii
+    encoded = binascii.b2a_base64(params.content.encode()).decode()
     code = (
-        f"import base64; "
+        f"import binascii; "
         f"f=open('{params.path}','w'); "
-        f"f.write(base64.b64decode('{encoded}').decode()); "
+        f"f.write(binascii.a2b_base64('{encoded}').decode()); "
         f"f.close(); "
-        f"print('Written', len(base64.b64decode('{encoded}')), 'bytes to', '{params.path}')"
+        f"print('Written', len(binascii.a2b_base64('{encoded}')), 'bytes to', '{params.path}')"
     )
     try:
         result = _repl_exec(code)
