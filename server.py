@@ -124,7 +124,7 @@ class WifiConfigInput(BaseModel):
 # ── Tools ──────────────────────────────────────────────────────
 
 @mcp.tool(
-    name="esp32_exec",
+    name="exec",
     annotations={
         "title": "Execute Python Code on ESP32",
         "readOnlyHint": False,
@@ -158,7 +158,7 @@ async def exec_code(params: ExecInput) -> str:
 
 
 @mcp.tool(
-    name="esp32_gpio_set",
+    name="gpio_set",
     annotations={
         "title": "Set ESP32 GPIO Pin",
         "readOnlyHint": False,
@@ -196,7 +196,7 @@ async def gpio_set(params: GpioSetInput) -> str:
 
 
 @mcp.tool(
-    name="esp32_gpio_read",
+    name="gpio_read",
     annotations={
         "title": "Read ESP32 GPIO Pin",
         "readOnlyHint": True,
@@ -229,7 +229,7 @@ async def gpio_read(params: GpioReadInput) -> str:
 
 
 @mcp.tool(
-    name="esp32_neopixel",
+    name="neopixel",
     annotations={
         "title": "Control ESP32 Neopixel RGB LED",
         "readOnlyHint": False,
@@ -283,7 +283,7 @@ async def neopixel(params: NeopixelInput) -> str:
 
 
 @mcp.tool(
-    name="esp32_info",
+    name="info",
     annotations={
         "title": "Get ESP32 Chip Information",
         "readOnlyHint": True,
@@ -313,7 +313,7 @@ async def chip_info() -> str:
 
 
 @mcp.tool(
-    name="esp32_pwm",
+    name="pwm",
     annotations={
         "title": "Control ESP32 PWM Output",
         "readOnlyHint": False,
@@ -350,7 +350,7 @@ async def pwm(params: PwmInput) -> str:
 
 
 @mcp.tool(
-    name="esp32_scan_wifi",
+    name="scan_wifi",
     annotations={
         "title": "Scan WiFi Networks",
         "readOnlyHint": True,
@@ -380,7 +380,7 @@ async def scan_wifi() -> str:
 
 
 @mcp.tool(
-    name="esp32_reboot",
+    name="reboot",
     annotations={
         "title": "Reboot ESP32",
         "readOnlyHint": False,
@@ -403,7 +403,7 @@ async def reboot() -> str:
 
 
 @mcp.tool(
-    name="esp32_adc_read",
+    name="adc_read",
     annotations={
         "title": "Read ESP32 ADC Pin",
         "readOnlyHint": True,
@@ -440,7 +440,7 @@ async def adc_read(params: AdcReadInput) -> str:
 
 
 @mcp.tool(
-    name="esp32_i2c_scan",
+    name="i2c_scan",
     annotations={
         "title": "Scan I2C Bus for Devices",
         "readOnlyHint": True,
@@ -478,7 +478,7 @@ async def i2c_scan(params: I2cScanInput) -> str:
 
 
 @mcp.tool(
-    name="esp32_temperature",
+    name="temperature",
     annotations={
         "title": "Read ESP32 Internal Temperature",
         "readOnlyHint": True,
@@ -503,7 +503,7 @@ async def temperature() -> str:
 
 
 @mcp.tool(
-    name="esp32_wifi_config",
+    name="wifi_config",
     annotations={
         "title": "Configure ESP32 WiFi Connection",
         "readOnlyHint": False,
