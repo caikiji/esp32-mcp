@@ -73,7 +73,7 @@ def _repl_exec(code: str, timeout: int = REPL_TIMEOUT) -> str:
 
 class ExecInput(BaseModel):
     model_config = ConfigDict(str_strip_whitespace=True)
-    code: str = Field(..., description="Python code to execute on ESP32 (e.g. 'import machine; machine.Pin(48, machine.Pin.OUT).value(1)' for one-liners. Use newlines for multi-line blocks.)", min_length=1)
+    code: str = Field(..., description="Python code to execute on ESP32 (use newlines for multi-line blocks)", min_length=1)
 
 
 class GpioSetInput(BaseModel):
@@ -132,22 +132,7 @@ class FileDeleteInput(BaseModel):
     },
 )
 async def exec_code(params: ExecInput) -> str:
-    """Execute arbitrary Python code on the ESP32 MicroPython REPL.
-
-    Sends code to the ESP32's MicroPython REPL and returns the output.
-    Supports both one-liners and multi-line blocks.
-
-    Args:
-        params (ExecInput): Code to execute, containing:
-            - code (str): Python code to execute
-
-    Returns:
-        str: REPL output from the ESP32
-
-    Examples:
-        - Read chip info: code="import machine, esp, gc; print('Freq:', machine.freq()//1000000, 'MHz'); print('Flash:', esp.flash_size()//1048576, 'MB'); print('Free:', gc.mem_free()//1024, 'KB')"
-        - Scan WiFi: code="import network; w=network.WLAN(network.STA_IF); w.active(True); [print(a[0].decode(), a[3]) for a in w.scan()]"
-    """
+    """Execute Python code on the ESP32 MicroPython REPL."""
     try:
         result = _repl_exec(params.code, timeout=10)
         return result or "(no output)"
@@ -166,22 +151,7 @@ async def exec_code(params: ExecInput) -> str:
     },
 )
 async def gpio_set(params: GpioSetInput) -> str:
-    """Set an ESP32 GPIO pin HIGH, LOW, or TOGGLE.
-
-    Configures the specified pin as output and sets its level.
-
-    Args:
-        params (GpioSetInput): Pin control parameters containing:
-            - pin (int): GPIO pin number (0-48)
-            - value (int): 0=LOW, 1=HIGH, 2=TOGGLE
-
-    Returns:
-        str: Confirmation of the operation
-
-    Examples:
-        - Turn on GPIO2: pin=2, value=1
-        - Turn off onboard LED: pin=48, value=0
-    """
+    """Set GPIO pin HIGH(1), LOW(0), or TOGGLE(2)."""
     p, v = params.pin, params.value
     if v == 2:
         code = f"import machine; p=machine.Pin({p}, machine.Pin.OUT); p.value(not p.value()); print('GPIO{p} =', p.value())"
@@ -204,20 +174,7 @@ async def gpio_set(params: GpioSetInput) -> str:
     },
 )
 async def gpio_read(params: GpioReadInput) -> str:
-    """Read the current value of an ESP32 GPIO pin.
-
-    Configures the pin as input with pulldown and reads its level.
-
-    Args:
-        params (GpioReadInput): Pin read parameters containing:
-            - pin (int): GPIO pin number to read (0-48)
-
-    Returns:
-        str: The pin value (0 or 1)
-
-    Examples:
-        - Read button on GPIO0: pin=0
-    """
+    """Read GPIO pin value (0 or 1)."""
     p = params.pin
     code = f"import machine; p=machine.Pin({p}, machine.Pin.IN, machine.Pin.PULL_DOWN); print('GPIO{p} =', p.value())"
     try:
@@ -237,27 +194,7 @@ async def gpio_read(params: GpioReadInput) -> str:
     },
 )
 async def neopixel(params: NeopixelInput) -> str:
-    """Set a Neopixel (WS2812) RGB LED color.
-
-    Controls addressable RGB LEDs connected to the specified pin.
-    Works with both single LEDs and LED chains.
-
-    Args:
-        params (NeopixelInput): LED control parameters containing:
-            - pin (int): Data pin number (default: 48, the onboard LED)
-            - r (int): Red value 0-255
-            - g (int): Green value 0-255
-            - b (int): Blue value 0-255
-            - index (int): LED index in chain (default: 0)
-
-    Returns:
-        str: Confirmation of the color set
-
-    Examples:
-        - Red on onboard LED: pin=48, r=255, g=0, b=0
-        - Purple: r=255, g=0, b=255
-        - Turn off: r=0, g=0, b=0
-    """
+    """Set WS2812 RGB LED color."""
     p, idx, r, g, b = params.pin, params.index, params.r, params.g, params.b
     code = (
         f"import neopixel, machine; "
@@ -291,11 +228,7 @@ async def neopixel(params: NeopixelInput) -> str:
     },
 )
 async def chip_info() -> str:
-    """Get detailed information about the connected ESP32 chip.
-
-    Returns chip model, CPU frequency, flash size, free memory, and other hardware info.
-    No parameters required.
-    """
+    """Show chip info: model, frequency, flash, free memory."""
     code = (
         "import machine, esp, gc, sys; "
         "print('Chip:', sys.platform); "
@@ -321,22 +254,7 @@ async def chip_info() -> str:
     },
 )
 async def adc_read(params: AdcReadInput) -> str:
-    """Read the analog voltage from an ADC-capable GPIO pin.
-
-    Configures the pin as ADC with the specified attenuation and returns
-    both the raw value (0-4095) and the voltage in millivolts.
-
-    Args:
-        params (AdcReadInput): ADC read parameters containing:
-            - pin (int): ADC-capable GPIO pin number
-            - atten (int): Attenuation: 0=0dB(1V), 1=2.5dB(1.25V), 2=6dB(2V), 3=11dB(3.6V, default)
-
-    Returns:
-        str: ADC reading with raw value and voltage
-
-    Examples:
-        - Read floating pin 4 with 11dB attenuation: pin=4, atten=3
-    """
+    """Read analog voltage from an ADC pin."""
     p, a = params.pin, params.atten
     atten_map = {0: "ATTN_0DB", 1: "ATTN_2_5DB", 2: "ATTN_6DB", 3: "ATTN_11DB"}
     code = f"import machine; adc=machine.ADC(machine.Pin({p})); adc.atten(machine.ADC.{atten_map.get(a, 'ATTN_11DB')}); print('ADC pin', {p}, ':', adc.read(), 'raw,', adc.read_uv()//1000, 'mV')"
@@ -358,22 +276,7 @@ async def adc_read(params: AdcReadInput) -> str:
     },
 )
 async def wifi_config(params: WifiConfigInput) -> str:
-    """Connect the ESP32 to a WiFi network.
-
-    Configures the ESP32 as a WiFi station and connects to the
-    specified network. Returns the assigned IP address on success.
-
-    Args:
-        params (WifiConfigInput): WiFi configuration containing:
-            - ssid (str): WiFi network name
-            - password (str): WiFi network password
-
-    Returns:
-        str: Connection result with IP address or error
-
-    Examples:
-        - Connect to home network: ssid="MyWiFi", password="secret123"
-    """
+    """Connect ESP32 to a WiFi network. Returns IP address."""
     code = (
         f"import network, time; "
         f"w=network.WLAN(network.STA_IF); "
@@ -405,11 +308,7 @@ async def wifi_config(params: WifiConfigInput) -> str:
     },
 )
 async def file_list() -> str:
-    """List files and directories on the ESP32 filesystem.
-
-    Returns the contents of the root directory.
-    No parameters required.
-    """
+    """List files on the ESP32 filesystem."""
     code = "import os; [print(x[0], x[3], 'bytes') for x in os.ilistdir('/') if x[1]==32768]"
     try:
         result = _repl_exec(code)
@@ -429,17 +328,7 @@ async def file_list() -> str:
     },
 )
 async def file_read(path: str) -> str:
-    """Read a file from the ESP32 filesystem.
-
-    Args:
-        path (str): File path on ESP32 (e.g. 'boot.py')
-
-    Returns:
-        str: File contents
-
-    Examples:
-        - Read boot config: path='boot.py'
-    """
+    """Read a file from ESP32 (e.g. 'boot.py')."""
     code = f"f=open('{path}'); print(f.read()); f.close()"
     try:
         result = _repl_exec(code)
@@ -459,21 +348,7 @@ async def file_read(path: str) -> str:
     },
 )
 async def file_write(params: FileWriteInput) -> str:
-    """Write content to a file on the ESP32 filesystem.
-
-    Creates or overwrites a file with the given content.
-
-    Args:
-        params (FileWriteInput): File write parameters containing:
-            - path (str): File path (e.g. 'boot.py')
-            - content (str): File content to write
-
-    Returns:
-        str: Confirmation of the write operation
-
-    Examples:
-        - Write boot.py: path='boot.py', content='import webrepl\\nwebrepl.start()'
-    """
+    """Write or overwrite a file on ESP32."""
     import binascii
     encoded = binascii.b2a_base64(params.content.encode()).decode()
     code = (
@@ -501,18 +376,7 @@ async def file_write(params: FileWriteInput) -> str:
     },
 )
 async def file_delete(params: FileDeleteInput) -> str:
-    """Delete a file from the ESP32 filesystem.
-
-    Args:
-        params (FileDeleteInput): File deletion parameters containing:
-            - path (str): File path to delete
-
-    Returns:
-        str: Confirmation of deletion
-
-    Examples:
-        - Delete a file: path='test.txt'
-    """
+    """Delete a file on ESP32."""
     code = f"import os; os.remove('{params.path}'); print('Deleted', '{params.path}')"
     try:
         result = _repl_exec(code)

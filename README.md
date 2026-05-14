@@ -84,14 +84,17 @@ Add to your `claude_desktop_config.json`:
 
 | Tool | Description |
 |---|---|
-| `esp32_exec` | Execute arbitrary Python code on the ESP32 REPL |
-| `esp32_gpio_set` | Set GPIO pin HIGH, LOW, or TOGGLE |
-| `esp32_gpio_read` | Read the current value of a GPIO pin |
-| `esp32_neopixel` | Control WS2812 Neopixel RGB LEDs |
-| `esp32_info` | Get chip details (frequency, flash, memory) |
-| `esp32_pwm` | Configure PWM output on a GPIO pin |
-| `esp32_scan_wifi` | Scan for nearby WiFi networks |
-| `esp32_reboot` | Soft-reboot the ESP32 |
+| `exec` | Execute Python code on ESP32 REPL |
+| `gpio_set` | Set GPIO pin HIGH(1), LOW(0), or TOGGLE(2) |
+| `gpio_read` | Read GPIO pin value (0 or 1) |
+| `neopixel` | Set WS2812 RGB LED color |
+| `info` | Show chip info: model, frequency, flash, memory |
+| `adc_read` | Read analog voltage from an ADC pin |
+| `wifi_config` | Connect ESP32 to a WiFi network |
+| `file_list` | List files on ESP32 filesystem |
+| `file_read` | Read a file from ESP32 |
+| `file_write` | Write or overwrite a file on ESP32 |
+| `file_delete` | Delete a file on ESP32 |
 
 ## First-Time Setup
 
