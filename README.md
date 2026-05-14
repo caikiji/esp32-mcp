@@ -13,7 +13,7 @@ Control your ESP32 running MicroPython via USB serial — directly from any MCP-
 ```bash
 # Clone and enter the project
 git clone <your-repo>
-cd esp32-mcp
+cd mcp-esp32
 
 # Run with uv (recommended — auto-installs dependencies)
 uv run python3 server.py
@@ -58,7 +58,7 @@ Add to your `opencode.json`:
   "mcp": {
     "esp32": {
       "type": "local",
-      "command": ["uv", "run", "--directory", "/path/to/esp32-mcp", "python3", "server.py"],
+      "command": ["uv", "run", "--directory", "/path/to/mcp-esp32", "python3", "server.py"],
       "enabled": true
     }
   }
@@ -74,7 +74,7 @@ Add to your `claude_desktop_config.json`:
   "mcpServers": {
     "esp32": {
       "command": "uv",
-      "args": ["run", "--directory", "/path/to/esp32-mcp", "python3", "server.py"]
+      "args": ["run", "--directory", "/path/to/mcp-esp32", "python3", "server.py"]
     }
   }
 }
